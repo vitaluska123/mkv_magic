@@ -177,20 +177,39 @@ def voiceover_upload():
         m = re.match(r'Track ID (\d+): subtitles \(([^)]+)\)(?: \[(.*?)\])?', line)
         if m:
             track_id, subs_type, lang = m.groups()
-            ext = 'srt' if 'srt' in subs_type.lower() else 'ass'
+            ext = 'srt' if 'srt' in subs_type.lower() else subs_type.lower()
             subs_file = os.path.join(UPLOAD_FOLDER, f'subs_{track_id}.{ext}')
             subprocess.run([mkvextract, 'tracks', mkv_path, f'{track_id}:{subs_file}'], check=True)
-            # Определяем кодировку и читаем
-            with open(subs_file, 'rb') as f:
-                raw = f.read()
-                enc = chardet.detect(raw)['encoding'] or 'utf-8'
-                subs_text = raw.decode(enc, errors='replace')
-            label = f"{subs_type.upper()} ({lang})" if lang else subs_type.upper()
-            subs_tracks.append({
-                "text": subs_text,
-                "type": subs_type,
-                "label": label
-            })
+            # Если не srt — конвертируем в srt через ffmpeg
+            srt_file = subs_file
+            converted = False
+            if ext != 'srt':
+                srt_file = os.path.splitext(subs_file)[0] + '.srt'
+                try:
+                    subprocess.run([ffmpeg, '-y', '-i', subs_file, srt_file], check=True)
+                    converted = True
+                except Exception as e:
+                    srt_file = None
+            # Если есть srt-файл — используем его, иначе пропускаем дорожку
+            if srt_file and os.path.exists(srt_file):
+                with open(srt_file, 'rb') as f:
+                    raw = f.read()
+                    enc = chardet.detect(raw)['encoding'] or 'utf-8'
+                    subs_text = raw.decode(enc, errors='replace')
+                label = f"SRT ({lang})" if lang else "SRT"
+                subs_tracks.append({
+                    "text": subs_text,
+                    "type": 'srt',
+                    "label": label
+                })
+            else:
+                # Если не удалось сконвертировать — добавляем ошибку предпросмотра
+                subs_tracks.append({
+                    "text": '',
+                    "type": subs_type,
+                    "label": f"{subs_type.upper()} ({lang})" if lang else subs_type.upper(),
+                    "error": "Не удалось сконвертировать в SRT"
+                })
     # Для обратной совместимости (если только одна дорожка)
     subs_text = subs_tracks[0]["text"] if subs_tracks else None
     subs_type = subs_tracks[0]["type"] if subs_tracks else None
