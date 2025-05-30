@@ -1,0 +1,26 @@
+<!doctype html>
+<html>
+<head>
+<title>Извлечение субтитров из MKV</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+{% include '_header.html' %}
+<div class="container">
+<h2>Загрузка MKV-файла</h2>
+<form method=post enctype=multipart/form-data>
+  <input type=file name=mkvfile required>
+  <input type=submit value=Загрузить>
+</form>
+{% if subtitles %}
+  <h3>Субтитры:</h3>
+  {% for sub in subtitles %}
+    <div class="subtitle-block">
+      <b>{{sub['filename']}}</b> <a href="{{ url_for('download', filename=sub['filename']) }}">Скачать</a><br>
+      {{sub['preview']|safe}}
+    </div>
+  {% endfor %}
+{% endif %}
+</div>
+</body>
+</html>

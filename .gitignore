@@ -1,0 +1,65 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.pyc
+*.pdb
+*.egg-info/
+.env
+.venv
+venv/
+
+# VSCode
+.vscode/
+*.code-workspace
+
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# Logs
+*.log
+
+# Archives
+*.zip
+*.tar
+*.tar.gz
+*.rar
+*.7z
+
+# Media
+*.mp4
+*.mkv
+*.avi
+*.mov
+*.mp3
+*.wav
+*.mka
+*.aac
+*.flac
+*.ogg
+*.webm
+
+# Temporary
+*.tmp
+*.bak
+*.swp
+*.swo
+~$*
+
+# Project files
+ffmpeg.exe
+mkvextract.exe
+mkvmerge.exe
+run_voiceover.bat
+
+# User uploads and generated files
+web_extract_subs/static/uploads/
+web_extract_subs/static/outputs/
+web_extract_subs/static/tmp/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb

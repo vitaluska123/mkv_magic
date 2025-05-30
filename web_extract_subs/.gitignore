@@ -1,0 +1,12 @@
+# web_extract_subs
+__pycache__/
+*.pyc
+venv/
+.env
+.DS_Store
+*.mkv
+*.srt
+*.ass
+*.ssa
+*.sub
+*.tmp

@@ -1,0 +1,46 @@
+<!doctype html>
+<html>
+<head>
+<title>Извлечение аудио из MKV</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+{% include '_header.html' %}
+<div class="container">
+<h2>Извлечение аудиодорожек из MKV</h2>
+<form method=post enctype=multipart/form-data>
+  <input type=file name=mkvfile required>
+  <input type=submit value=Загрузить>
+</form>
+{% if error %}
+  <div style="color: #c00; margin: 16px 0; font-weight: bold;">{{ error }}</div>
+{% endif %}
+{% if tracks %}
+  <form method="post">
+    <input type="hidden" name="mkvfile_path" value="{{ mkvfile_path }}">
+    <h3>Выберите аудиодорожку для извлечения:</h3>
+    {% for track in tracks %}
+      <div style="margin-bottom:8px;">
+        <input type="radio" name="track_id" value="{{ track.id }}" id="track{{ track.id }}" required>
+        <label for="track{{ track.id }}">ID {{ track.id }} — {{ track.codec }} ({{ track.lang }})</label>
+      </div>
+    {% endfor %}
+    <input type="submit" name="extract" value="Извлечь аудио">
+  </form>
+{% endif %}
+{% if audio_file %}
+  <h3>Готово!</h3>
+  {% if preview_file %}
+    <audio controls style="width:100%;max-width:400px;">
+      <source src="{{ url_for('download', filename=preview_file) }}" type="audio/mp3">
+      Ваш браузер не поддерживает аудио.
+    </audio>
+    <br>
+    <span style="font-size:0.95em;color:#888;">(mp3 для предпрослушивания, оригинал ниже)</span>
+    <br>
+  {% endif %}
+  <a href="{{ url_for('download', filename=audio_file) }}">Скачать оригинальный аудиофайл</a>
+{% endif %}
+</div>
+</body>
+</html>

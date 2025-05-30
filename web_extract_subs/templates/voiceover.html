@@ -1,0 +1,72 @@
+<!doctype html>
+<html>
+<head>
+<title>Озвучка видео онлайн</title>
+<link rel="stylesheet" href="/static/style.css">
+<script src="https://unpkg.com/wavesurfer.js"></script>
+<style>
+/* Только для этой страницы: расширяем .container */
+.container {
+  max-width: none;
+  width: auto;
+  margin: 50px;
+}
+</style>
+</head>
+<body>
+{% include '_header.html' %}
+<div class="container">
+  <h2>Создание озвучки для MKV</h2>
+  <div id="project-archive-controls" style="margin:16px 0 24px 0;">
+    <button id="save-archive-btn" style="margin-right:12px;">Сохранить архив проекта</button>
+    <button id="load-archive-btn">Загрузить архив проекта</button>
+    <input type="file" id="load-archive-input" accept=".zip,application/zip" style="display:none;">
+  </div>
+  <div id="drop-zone" style="border:2px dashed #1a7edb;padding:32px;text-align:center;margin-bottom:24px;cursor:pointer;">
+    <b>Перетащите сюда MKV-файл</b> или <input type="file" id="file-input" accept="video/x-matroska,video/*">
+  </div>
+  <div style="display:flex;gap:32px;align-items:flex-start;">
+    <div id="video-preview" style="display:none;margin-bottom:24px;flex:2;max-width:420px;">
+      <video id="video" controls style="max-width:100%;background:#000;border-radius:8px;"></video>
+    </div>
+    <div id="subs-preview-block" style="display:none;flex:1;min-width:260px;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <h3 style="margin-top:0;margin-bottom:0;">Субтитры</h3>
+        <select id="subs-track-select" style="display:none;font-size:1em;padding:2px 8px;border-radius:5px;"></select>
+      </div>
+      <div id="subs-preview" style="background:#f2f4fa;border-radius:8px;padding:12px 14px;max-height:340px;overflow:auto;font-size:1.04em;"></div>
+      <div id="subs-upload-block" style="margin-top:12px;display:none;">
+        <label style="font-size:0.98em;">Загрузить свои субтитры (.srt, .ass):
+          <input type="file" id="subs-input" accept=".srt,.ass,.vtt,.txt">
+        </label>
+      </div>
+    </div>
+  </div>
+  <div id="timelines" style="display:none;">
+    <div style="display:flex;align-items:center;gap:18px;margin-bottom:2px;">
+      <h3 style="margin:0;">Таймлайн оригинального аудио</h3>
+      <span id="original-audio-time" style="font-size:1.08em;color:#2a3a5a;"></span>
+    </div>
+    <div id="original-audio-timeline"></div>
+    <div style="display:flex;align-items:center;gap:18px;margin:18px 0 2px 0;">
+      <h3 style="margin:0;">Таймлайн вашей озвучки</h3>
+      <span id="user-audio-time" style="font-size:1.08em;color:#2a3a5a;"></span>
+    </div>
+    <div id="user-audio-timeline"></div>
+    <button id="record-btn">Записать озвучку</button>
+    <button id="stop-btn" disabled>Стоп</button>
+    <button id="play-mix-btn" disabled>Прослушать микс</button>
+    <button id="download-btn" disabled>Скачать озвучку</button>
+  </div>
+  <!-- Прогресс-бар -->
+  <div id="progress-bar-block" style="margin:18px 0 24px 0; display:none;">
+    <div style="background:#e9eaf0;border-radius:8px;overflow:hidden;height:22px;">
+      <div id="progress-bar" style="height:22px;width:0%;background:#1a7edb;transition:width 0.3s;"></div>
+    </div>
+    <div id="progress-bar-label" style="margin-top:6px;font-size:1.04em;color:#2a3a5a;"></div>
+  </div>
+  <div id="status" style="margin-top:20px;color:#c00;"></div>
+</div>
+<script src="/static/voiceover.js"></script>
+</body>
+</html>
