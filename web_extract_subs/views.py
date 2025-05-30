@@ -28,8 +28,11 @@ def parse_srt_preview(srt_text):
         else:
             time = ''
             text = '\n'.join(lines[idx:])
-        text = re.sub(r'{\\?[^}]+}', '', text)
-        text = re.sub(r'<[^>]+>', '', text)
+        # Удаляем управляющие коды типа {\an8}, html-теги <font ...>, <i> и т.д.
+        text = re.sub(r'{\\?[^}]+}', '', text)  # {\an8}
+        text = re.sub(r'<[^>]+>', '', text)       # <font ...>, <i>, <b> и др.
+        text = re.sub(r'\\N', ' ', text)        # спец. переносы строк
+        text = text.replace('\n', ' ')
         if len(text) > 180:
             text = text[:180] + '...'
         html_blocks.append(f'<div class="srt-block"><span class="srt-time">{time}</span><span class="srt-text">{text.strip()}</span></div>')

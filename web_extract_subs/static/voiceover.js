@@ -94,11 +94,35 @@ function uploadAndExtract(file) {
         subsTrackSelect.appendChild(opt);
       });
       subsTrackSelect.style.display = '';
-      // Показываем первую дорожку по умолчанию
-      showSubs(data.subs_tracks[0].text, data.subs_tracks[0].type);
+      // --- ИСПРАВЛЕНИЕ: ищем первую валидную (непустую) дорожку ---
+      let firstValidIdx = data.subs_tracks.findIndex(t => t.text && t.text.trim());
+      if (firstValidIdx !== -1) {
+        subsTrackSelect.value = firstValidIdx;
+        showSubs(data.subs_tracks[firstValidIdx].text, data.subs_tracks[firstValidIdx].type);
+      } else {
+        // Если есть ошибка в первой дорожке — показываем её
+        const firstError = data.subs_tracks.find(t => t.error);
+        if (firstError) {
+          subsPreview.innerHTML = firstError.error;
+        } else {
+          subsPreview.innerHTML = 'Субтитры не найдены или не поддерживаются.';
+        }
+        subsPreviewBlock.style.display = '';
+        subsUploadBlock.style.display = 'none';
+      }
       subsTrackSelect.onchange = function() {
         const idx = parseInt(this.value);
-        if (allExtractedSubs[idx]) showSubs(allExtractedSubs[idx].text, allExtractedSubs[idx].type);
+        if (allExtractedSubs[idx] && allExtractedSubs[idx].text && allExtractedSubs[idx].text.trim()) {
+          showSubs(allExtractedSubs[idx].text, allExtractedSubs[idx].type);
+        } else if (allExtractedSubs[idx] && allExtractedSubs[idx].error) {
+          subsPreview.innerHTML = allExtractedSubs[idx].error;
+          subsPreviewBlock.style.display = '';
+          subsUploadBlock.style.display = 'none';
+        } else {
+          subsPreview.innerHTML = 'Субтитры не найдены или не поддерживаются.';
+          subsPreviewBlock.style.display = '';
+          subsUploadBlock.style.display = 'none';
+        }
       };
     } else if (data.subs_text) {
       subsTrackSelect.style.display = 'none';
@@ -440,26 +464,73 @@ function parseSrtBlocks(srtText) {
 }
 
 let parsedSrtBlocks = [];
+let lastSrtBlockIdx = -1;
+let fadeDuration = 0.4; // сек
+let fadeBuffer = 0.45; // за сколько до/после делать fade
 function showCurrentSrtBlock(currentTime) {
-  if (!parsedSrtBlocks.length) { subsPreview.innerHTML = ''; return; }
-  const block = parsedSrtBlocks.find(s => currentTime >= s.start && currentTime <= s.end);
-  if (block) {
-    subsPreview.innerHTML = block.html;
-    subsPreview.style.background = '#fffbe6';
-    subsPreview.style.fontWeight = 'bold';
-    subsPreview.style.fontSize = '1.25em';
-    subsPreview.style.color = '#222';
-    subsPreview.style.textAlign = 'center';
-    subsPreview.style.padding = '18px 14px';
-  } else {
-    subsPreview.innerHTML = '';
+  if (!parsedSrtBlocks.length) {
+    subsPreview.innerHTML = `<div class="subs-placeholder">
+      <svg viewBox='0 0 24 24' fill='none'><rect x='3' y='7' width='18' height='10' rx='2' stroke='#b0b4c0' stroke-width='1.5'/><rect x='7' y='11' width='10' height='2' rx='1' fill='#b0b4c0'/></svg>
+      <div>Субтитры не выбраны</div>
+    </div>`;
     subsPreview.style.background = '#f2f4fa';
     subsPreview.style.fontWeight = '';
     subsPreview.style.fontSize = '';
     subsPreview.style.color = '';
     subsPreview.style.textAlign = '';
     subsPreview.style.padding = '12px 14px';
+    lastSrtBlockIdx = -1;
+    return;
   }
+  let idx = parsedSrtBlocks.findIndex(s => currentTime >= s.start && currentTime <= s.end);
+  if (idx === -1) {
+    // fade out если был блок
+    if (lastSrtBlockIdx !== -1) {
+      const block = parsedSrtBlocks[lastSrtBlockIdx];
+      const fadeOutStart = block.end - fadeBuffer;
+      if (currentTime > block.end) {
+        subsPreview.innerHTML = '';
+        lastSrtBlockIdx = -1;
+      } else if (currentTime >= fadeOutStart && currentTime <= block.end) {
+        subsPreview.innerHTML = `<div class='srt-block-animated fading'>${block.html}</div>`;
+        setTimeout(() => {
+          if (Math.abs(videoElem.currentTime - currentTime) < 0.1) subsPreview.innerHTML = '';
+        }, fadeDuration * 1000);
+      } else {
+        subsPreview.innerHTML = '';
+        lastSrtBlockIdx = -1;
+      }
+    } else {
+      subsPreview.innerHTML = '';
+    }
+    return;
+  }
+  const block = parsedSrtBlocks[idx];
+  const fadeInEnd = block.start + fadeBuffer;
+  const fadeOutStart = block.end - fadeBuffer;
+  let className = 'srt-block-animated';
+  if (currentTime >= block.start && currentTime < fadeInEnd) {
+    className += ' visible';
+  } else if (currentTime >= fadeInEnd && currentTime < fadeOutStart) {
+    className += ' visible';
+  } else if (currentTime >= fadeOutStart && currentTime <= block.end) {
+    className += ' fading';
+  } else {
+    className += '';
+  }
+  // Если следующий блок идёт сразу — не анимируем, просто показываем
+  const nextBlock = parsedSrtBlocks[idx+1];
+  if (nextBlock && Math.abs(nextBlock.start - block.end) < fadeBuffer*1.1) {
+    className = 'srt-block-animated visible';
+  }
+  subsPreview.innerHTML = `<div class='${className}'>${block.html}</div>`;
+  subsPreview.style.background = '#fffbe6';
+  subsPreview.style.fontWeight = 'bold';
+  subsPreview.style.fontSize = '1.25em';
+  subsPreview.style.color = '#222';
+  subsPreview.style.textAlign = 'center';
+  subsPreview.style.padding = '18px 14px';
+  lastSrtBlockIdx = idx;
 }
 
 function enableLiveSrtBlockDisplay() {
@@ -674,11 +745,35 @@ function uploadAndExtract(file) {
         subsTrackSelect.appendChild(opt);
       });
       subsTrackSelect.style.display = '';
-      // Показываем первую дорожку по умолчанию
-      showSubs(data.subs_tracks[0].text, data.subs_tracks[0].type);
+      // --- ИСПРАВЛЕНИЕ: ищем первую валидную (непустую) дорожку ---
+      let firstValidIdx = data.subs_tracks.findIndex(t => t.text && t.text.trim());
+      if (firstValidIdx !== -1) {
+        subsTrackSelect.value = firstValidIdx;
+        showSubs(data.subs_tracks[firstValidIdx].text, data.subs_tracks[firstValidIdx].type);
+      } else {
+        // Если есть ошибка в первой дорожке — показываем её
+        const firstError = data.subs_tracks.find(t => t.error);
+        if (firstError) {
+          subsPreview.innerHTML = firstError.error;
+        } else {
+          subsPreview.innerHTML = 'Субтитры не найдены или не поддерживаются.';
+        }
+        subsPreviewBlock.style.display = '';
+        subsUploadBlock.style.display = 'none';
+      }
       subsTrackSelect.onchange = function() {
         const idx = parseInt(this.value);
-        if (allExtractedSubs[idx]) showSubs(allExtractedSubs[idx].text, allExtractedSubs[idx].type);
+        if (allExtractedSubs[idx] && allExtractedSubs[idx].text && allExtractedSubs[idx].text.trim()) {
+          showSubs(allExtractedSubs[idx].text, allExtractedSubs[idx].type);
+        } else if (allExtractedSubs[idx] && allExtractedSubs[idx].error) {
+          subsPreview.innerHTML = allExtractedSubs[idx].error;
+          subsPreviewBlock.style.display = '';
+          subsUploadBlock.style.display = 'none';
+        } else {
+          subsPreview.innerHTML = 'Субтитры не найдены или не поддерживаются.';
+          subsPreviewBlock.style.display = '';
+          subsUploadBlock.style.display = 'none';
+        }
       };
     } else if (data.subs_text) {
       subsTrackSelect.style.display = 'none';
