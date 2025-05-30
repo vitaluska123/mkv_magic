@@ -98,6 +98,35 @@ function hideModalProgress() {
   if (modalProgress) modalProgress.style.display = 'none';
 }
 
+// --- SSE прогресс ---
+function startProgressSSE() {
+  let lastPercent = null;
+  let lastLabel = null;
+  const es = new EventSource('/voiceover-progress-sse');
+  es.onmessage = function(event) {
+    try {
+      const prog = JSON.parse(event.data);
+      debugLog('SSE /voiceover-progress-sse', prog);
+      if (prog && prog.percent !== undefined) {
+        if (prog.percent !== lastPercent || prog.label !== lastLabel) {
+          updateModalProgress(prog.percent, prog.label || 'Обработка...');
+          lastPercent = prog.percent;
+          lastLabel = prog.label;
+        }
+      }
+      if (prog && prog.done) {
+        es.close();
+      }
+    } catch(e) {
+      debugLog('Ошибка SSE', e);
+    }
+  };
+  es.onerror = function(e) {
+    debugLog('SSE error', e);
+    es.close();
+  };
+}
+
 // --- ВЫБОР ДОРОЖКИ СУБТИТРОВ ---
 function uploadAndExtract(file) {
   debugLog('Начало загрузки MKV', file);
@@ -105,45 +134,17 @@ function uploadAndExtract(file) {
   const formData = new FormData();
   formData.append('mkvfile', file);
   updateModalProgress(10, 'Загрузка файла...');
+
+  // --- SSE прогресс ---
+  startProgressSSE();
+
   fetch('/voiceover-upload', {
     method:'POST',
     body:formData,
-  }).then(async r => {
-    updateModalProgress(30, 'Обработка видео [1/3]');
-    // эмулируем этапы для UX (реально сервер работает атомарно, но UX будет лучше)
-    await new Promise(res => setTimeout(res, 200));
-    updateModalProgress(60, 'Обработка звуковой дорожки [2/3]');
-    await new Promise(res => setTimeout(res, 200));
-    updateModalProgress(80, 'Обработка субтитров [3/3]');
-    await new Promise(res => setTimeout(res, 200));
-    return r.json();
   })
+  .then(r => r.json())
   .then(async data => {
     debugLog('Ответ от /voiceover-upload', data);
-    // --- Динамический прогресс по дорожкам ---
-    let progress = 30;
-    let step = 0;
-    // Видео
-    const videoCount = data.video_tracks ? data.video_tracks.length : (data.video_url ? 1 : 0);
-    for (let i = 0; i < videoCount; ++i) {
-      updateModalProgress(progress, `Обработка видео [${i+1}/${videoCount}]`);
-      await new Promise(res => setTimeout(res, 200));
-      progress += 10;
-    }
-    // Аудио
-    const audioCount = data.audio_tracks ? data.audio_tracks.length : (data.audio_url ? 1 : 0);
-    for (let i = 0; i < audioCount; ++i) {
-      updateModalProgress(progress, `Обработка звуковой дорожки [${i+1}/${audioCount}]`);
-      await new Promise(res => setTimeout(res, 200));
-      progress += 10;
-    }
-    // Субтитры
-    const subsCount = data.subs_tracks ? data.subs_tracks.length : (data.subs_text ? 1 : 0);
-    for (let i = 0; i < subsCount; ++i) {
-      updateModalProgress(progress, `Обработка субтитров [${i+1}/${subsCount}]`);
-      await new Promise(res => setTimeout(res, 200));
-      progress += 10;
-    }
     updateModalProgress(100, 'Готово!');
     setTimeout(hideModalProgress, 600);
     if (data.error) {
@@ -151,8 +152,14 @@ function uploadAndExtract(file) {
       statusDiv.textContent = data.error;
       return;
     }
+    
     showMainWorkspace();
-    showVideoAndAudio(data.video_url, data.audio_url);
+    // --- Показываем предпросмотр видео и таймлайны ---
+    showVideoAndAudio(data.video_url || '', data.audio_url || '');
+    // --- Сохраняем ссылки для архивации ---
+    window.videoUrl = data.video_url || '';
+    window.audioUrl = data.audio_url || '';
+    // --- Инициализация аудио и субтитров ---
     setAudioElements({
       wavesurferOrig: window.wavesurferOriginal,
       wavesurferUsr: window.wavesurferUser,
@@ -165,6 +172,14 @@ function uploadAndExtract(file) {
       wavesurferOrig: window.wavesurferOriginal,
       wavesurferUsr: window.wavesurferUser
     });
+    // --- Принудительно обновляем src для video и audio ---
+    if (videoElem && data.video_url) {
+      videoElem.src = data.video_url;
+      videoElem.load();
+    }
+    if (window.wavesurferOriginal && data.audio_url) {
+      window.wavesurferOriginal.load(data.audio_url);
+    }
     // --- поддержка нескольких субтитров ---
     if (data.subs_tracks && Array.isArray(data.subs_tracks) && data.subs_tracks.length > 0) {
       allExtractedSubs = data.subs_tracks;
@@ -248,7 +263,9 @@ const mainWorkspace = document.getElementById('main-workspace');
 function showMainWorkspace() {
   debugLog('Показ main-workspace');
   if (modalUpload) modalUpload.style.display = 'none';
-  if (mainWorkspace) mainWorkspace.style.display = '';
+  if (mainWorkspace) {
+    mainWorkspace.style.display = 'block';
+  }
 }
 function showModalUpload() {
   debugLog('Показ модалки загрузки');
