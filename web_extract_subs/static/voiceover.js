@@ -43,6 +43,7 @@ import { setSubsElements, showSubs } from './subs.js';
 import { setAudioElements, encodeWAV, createEmptyUserAudio, syncTimelineToVideo, syncAllTimelines, syncAllTimelinesWithCursors, enableTimelineTimeDisplay } from './audio.js';
 import { showProgress, hideProgress, setVideoSize, setUiElements, showVideoAndAudio } from './ui.js';
 import { saveArchive, loadArchive, setArchiveElements } from './archive.js';
+import { debugLog } from './debug.js';
 
 // Инициализация UI-модуля
 setUiElements({
@@ -76,69 +77,81 @@ setSubsElements({
   wavesurferUsr: wavesurferUser
 });
 
-// Drag&Drop
-['dragenter','dragover','dragleave','drop'].forEach(eventName => {
-  dropZone.addEventListener(eventName, e => e.preventDefault());
-});
-dropZone.addEventListener('drop', e => {
-  const files = e.dataTransfer.files;
-  if (files.length) handleFile(files[0]);
-});
-fileInput.addEventListener('change', e => {
-  if (e.target.files.length) handleFile(e.target.files[0]);
-});
+// === МОДАЛКА ПРОГРЕССА ===
+const modalProgress = document.getElementById('modal-progress');
+const modalProgressBar = document.getElementById('modal-progress-bar');
+const modalProgressLabel = document.getElementById('modal-progress-label');
 
-function handleFile(file) {
-  if (!file.name.match(/\.mkv$/i)) {
-    statusDiv.textContent = 'Пожалуйста, выберите MKV-файл.';
-    return;
-  }
-  mkvFile = file;
-  statusDiv.textContent = 'Загружаем и извлекаем дорожки...';
-  uploadAndExtract(file);
+function showModalProgress(label) {
+  debugLog('Показ модалки прогресса', label);
+  if (modalProgress) modalProgress.style.display = 'flex';
+  if (modalProgressLabel) modalProgressLabel.textContent = label || 'Подождите, идёт обработка файла';
+  if (modalProgressBar) modalProgressBar.style.width = '0%';
 }
-window.handleFile = handleFile;
-
-// --- Кнопки изменения размера видео ---
-const videoResizeBar = document.createElement('div');
-videoResizeBar.style.textAlign = 'right';
-videoResizeBar.style.marginBottom = '4px';
-videoResizeBar.innerHTML = '<button id="video-size-dec" style="font-size:1.2em;">–</button> <button id="video-size-inc" style="font-size:1.2em;">+</button>';
-videoPreviewDiv.parentNode.insertBefore(videoResizeBar, videoPreviewDiv);
-document.getElementById('video-size-dec').onclick = () => setVideoSize(Math.max(0.5, 1-0.2));
-document.getElementById('video-size-inc').onclick = () => setVideoSize(Math.min(2, 1+0.2));
-setVideoSize(1);
-
-// --- Сохранение и загрузка архива проекта ---
-saveArchiveBtn.onclick = async function() {
-  await saveArchive();
-};
-loadArchiveBtn.onclick = () => loadArchiveInput.click();
-loadArchiveInput.onchange = function(e) {
-  if (!e.target.files.length) return;
-  loadArchive(e.target.files[0]);
-};
+function updateModalProgress(percent, label) {
+  debugLog('Обновление прогресса', percent, label);
+  if (modalProgressBar) modalProgressBar.style.width = percent + '%';
+  if (modalProgressLabel && label) modalProgressLabel.textContent = label;
+}
+function hideModalProgress() {
+  debugLog('Скрытие модалки прогресса');
+  if (modalProgress) modalProgress.style.display = 'none';
+}
 
 // --- ВЫБОР ДОРОЖКИ СУБТИТРОВ ---
-// uploadAndExtract, showVideoAndAudio, запись, timeline и прочее теперь делегируются в модули
 function uploadAndExtract(file) {
+  debugLog('Начало загрузки MKV', file);
+  showModalProgress('Загрузка файла...');
   const formData = new FormData();
   formData.append('mkvfile', file);
-  showProgress(10, 'Загрузка файла...');
+  updateModalProgress(10, 'Загрузка файла...');
   fetch('/voiceover-upload', {
     method:'POST',
     body:formData,
-  }).then(r => {
-    showProgress(60, 'Извлечение дорожек...');
+  }).then(async r => {
+    updateModalProgress(30, 'Обработка видео [1/3]');
+    // эмулируем этапы для UX (реально сервер работает атомарно, но UX будет лучше)
+    await new Promise(res => setTimeout(res, 200));
+    updateModalProgress(60, 'Обработка звуковой дорожки [2/3]');
+    await new Promise(res => setTimeout(res, 200));
+    updateModalProgress(80, 'Обработка субтитров [3/3]');
+    await new Promise(res => setTimeout(res, 200));
     return r.json();
   })
-  .then(data => {
-    showProgress(100, 'Готово!');
-    setTimeout(hideProgress, 800);
+  .then(async data => {
+    debugLog('Ответ от /voiceover-upload', data);
+    // --- Динамический прогресс по дорожкам ---
+    let progress = 30;
+    let step = 0;
+    // Видео
+    const videoCount = data.video_tracks ? data.video_tracks.length : (data.video_url ? 1 : 0);
+    for (let i = 0; i < videoCount; ++i) {
+      updateModalProgress(progress, `Обработка видео [${i+1}/${videoCount}]`);
+      await new Promise(res => setTimeout(res, 200));
+      progress += 10;
+    }
+    // Аудио
+    const audioCount = data.audio_tracks ? data.audio_tracks.length : (data.audio_url ? 1 : 0);
+    for (let i = 0; i < audioCount; ++i) {
+      updateModalProgress(progress, `Обработка звуковой дорожки [${i+1}/${audioCount}]`);
+      await new Promise(res => setTimeout(res, 200));
+      progress += 10;
+    }
+    // Субтитры
+    const subsCount = data.subs_tracks ? data.subs_tracks.length : (data.subs_text ? 1 : 0);
+    for (let i = 0; i < subsCount; ++i) {
+      updateModalProgress(progress, `Обработка субтитров [${i+1}/${subsCount}]`);
+      await new Promise(res => setTimeout(res, 200));
+      progress += 10;
+    }
+    updateModalProgress(100, 'Готово!');
+    setTimeout(hideModalProgress, 600);
     if (data.error) {
+      debugLog('Ошибка загрузки', data.error);
       statusDiv.textContent = data.error;
       return;
     }
+    showMainWorkspace();
     showVideoAndAudio(data.video_url, data.audio_url);
     setAudioElements({
       wavesurferOrig: window.wavesurferOriginal,
@@ -216,7 +229,110 @@ function uploadAndExtract(file) {
     }
   })
   .catch(e => {
-    hideProgress();
+    debugLog('Ошибка fetch', e);
+    hideModalProgress();
     statusDiv.textContent = 'Ошибка загрузки: ' + e;
   });
 }
+
+
+// === МОДАЛКА ЗАГРУЗКИ ===
+const modalUpload = document.getElementById('modal-upload');
+const modalDropZone = document.getElementById('modal-drop-zone');
+const modalMkvBtn = document.getElementById('modal-mkv-btn');
+const modalMkvInput = document.getElementById('modal-mkv-input');
+const modalArchiveBtn = document.getElementById('modal-archive-btn');
+const modalArchiveInput = document.getElementById('modal-archive-input');
+const mainWorkspace = document.getElementById('main-workspace');
+
+function showMainWorkspace() {
+  debugLog('Показ main-workspace');
+  if (modalUpload) modalUpload.style.display = 'none';
+  if (mainWorkspace) mainWorkspace.style.display = '';
+}
+function showModalUpload() {
+  debugLog('Показ модалки загрузки');
+  if (modalUpload) modalUpload.style.display = 'flex';
+  if (mainWorkspace) mainWorkspace.style.display = 'none';
+}
+
+if (modalDropZone && modalMkvBtn && modalMkvInput && modalArchiveBtn && modalArchiveInput) {
+  // Drag&Drop для модалки
+  ['dragenter','dragover'].forEach(eventName => {
+    modalDropZone.addEventListener(eventName, e => {
+      e.preventDefault();
+      modalDropZone.style.background = '#e9f3ff';
+      modalDropZone.style.borderColor = '#1a7edb';
+    });
+  });
+  ['dragleave','drop'].forEach(eventName => {
+    modalDropZone.addEventListener(eventName, e => {
+      e.preventDefault();
+      modalDropZone.style.background = '';
+      modalDropZone.style.borderColor = '#1a7edb';
+    });
+  });
+  modalDropZone.addEventListener('drop', e => {
+    const files = e.dataTransfer.files;
+    if (!files.length) return;
+    const file = files[0];
+    handleModalFile(file);
+  });
+
+  modalMkvBtn.addEventListener('click', () => modalMkvInput.click());
+  modalArchiveBtn.addEventListener('click', () => modalArchiveInput.click());
+  modalMkvInput.addEventListener('change', e => {
+    if (e.target.files.length) handleModalFile(e.target.files[0]);
+  });
+  modalArchiveInput.addEventListener('change', e => {
+    if (e.target.files.length) handleModalFile(e.target.files[0]);
+  });
+}
+
+function handleModalFile(file) {
+  debugLog('handleModalFile', file);
+  if (!file) return;
+  if (file.name.match(/\.mkv$/i)) {
+    handleFile(file);
+  } else if (file.name.match(/\.zip$/i)) {
+    debugLog('Начало загрузки архива', file);
+    showModalProgress('Загрузка архива...');
+    loadArchive(file);
+  } else {
+    debugLog('Неподдерживаемый тип файла', file);
+    if (modalDropZone) {
+      modalDropZone.style.background = '#ffeaea';
+      modalDropZone.style.borderColor = '#c00';
+    }
+    const hint = document.getElementById('modal-upload-hint');
+    if (hint) {
+      hint.textContent = 'Поддерживаются только MKV-файлы и архивы проекта (.zip)';
+      hint.style.color = '#c00';
+    }
+    setTimeout(() => {
+      if (modalDropZone) {
+        modalDropZone.style.background = '';
+        modalDropZone.style.borderColor = '#1a7edb';
+      }
+      if (hint) {
+        hint.textContent = 'Поддерживаются MKV-файлы и архивы проекта (.zip)';
+        hint.style.color = '#888';
+      }
+    }, 1800);
+  }
+}
+
+function handleFile(file) {
+  debugLog('handleFile', file);
+  if (!file.name.match(/\.mkv$/i)) {
+    statusDiv.textContent = 'Пожалуйста, выберите MKV-файл.';
+    return;
+  }
+  mkvFile = file;
+  statusDiv.textContent = 'Загружаем и извлекаем дорожки...';
+  uploadAndExtract(file);
+}
+window.handleFile = handleFile;
+
+// Показываем модалку при старте, скрываем рабочую область
+showModalUpload();

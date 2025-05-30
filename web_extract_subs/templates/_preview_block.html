@@ -1,0 +1,17 @@
+<div id="preview-block" style="display:flex;gap:32px;align-items:flex-start;">
+  <div id="video-preview" style="display:none;margin-bottom:24px;flex:2;max-width:420px;">
+    <video id="video" controls style="max-width:100%;background:#000;border-radius:8px;"></video>
+  </div>
+  <div id="subs-preview-block" style="display:none;flex:1;min-width:260px;">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <h3 style="margin-top:0;margin-bottom:0;">Субтитры</h3>
+      <select id="subs-track-select" style="display:none;font-size:1em;padding:2px 8px;border-radius:5px;"></select>
+    </div>
+    <div id="subs-preview" style="background:#f2f4fa;border-radius:8px;padding:12px 14px;max-height:340px;overflow:auto;font-size:1.04em;"></div>
+    <div id="subs-upload-block" style="margin-top:12px;display:none;">
+      <label style="font-size:0.98em;">Загрузить свои субтитры (.srt, .ass):
+        <input type="file" id="subs-input" accept=".srt,.ass,.vtt,.txt">
+      </label>
+    </div>
+  </div>
+</div>

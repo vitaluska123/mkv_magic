@@ -1,0 +1,14 @@
+<div id="modal-upload" class="modal" style="display:flex;align-items:center;justify-content:center;position:fixed;z-index:1000;left:0;top:0;width:100vw;height:100vh;background:rgba(30,40,60,0.18);backdrop-filter:blur(2px);">
+  <div class="modal-content" style="background:#fff;border-radius:12px;box-shadow:0 4px 32px #0002;padding:38px 44px;min-width:340px;max-width:96vw;">
+    <h2 style="margin-top:0;">Загрузка проекта</h2>
+    <div id="modal-drop-zone" style="border:2px dashed #1a7edb;padding:32px;text-align:center;margin-bottom:24px;cursor:pointer;min-width:320px;">
+      <b>Перетащите сюда MKV-файл или архив проекта</b><br>
+      <span style="font-size:0.98em;color:#444;">или выберите вручную:</span><br><br>
+      <input type="file" id="modal-mkv-input" accept="video/x-matroska,video/*" style="display:none;">
+      <button id="modal-mkv-btn" style="padding:8px 18px;margin-right:12px;">Выбрать MKV</button>
+      <input type="file" id="modal-archive-input" accept=".zip,application/zip" style="display:none;">
+      <button id="modal-archive-btn" style="padding:8px 18px;">Загрузить архив</button>
+      <div id="modal-upload-hint" style="margin-top:12px;font-size:0.97em;color:#888;">Поддерживаются MKV-файлы и архивы проекта (.zip)</div>
+    </div>
+  </div>
+</div>
