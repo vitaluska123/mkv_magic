@@ -140,6 +140,18 @@ function uploadAndExtract(file) {
       return;
     }
     showVideoAndAudio(data.video_url, data.audio_url);
+    setAudioElements({
+      wavesurferOrig: window.wavesurferOriginal,
+      wavesurferUsr: window.wavesurferUser,
+      videoEl: videoElem,
+      userAudioBuf: window.userAudioBuffer || null
+    });
+    setSubsElements({
+      subsPreviewEl: subsPreview,
+      videoEl: videoElem,
+      wavesurferOrig: window.wavesurferOriginal,
+      wavesurferUsr: window.wavesurferUser
+    });
     // --- поддержка нескольких субтитров ---
     if (data.subs_tracks && Array.isArray(data.subs_tracks) && data.subs_tracks.length > 0) {
       allExtractedSubs = data.subs_tracks;
@@ -151,13 +163,13 @@ function uploadAndExtract(file) {
         subsTrackSelect.appendChild(opt);
       });
       subsTrackSelect.style.display = '';
-      // --- ИСПРАВЛЕНИЕ: ищем первую валидную (непустую) дорожку ---
       let firstValidIdx = data.subs_tracks.findIndex(t => t.text && t.text.trim());
       if (firstValidIdx !== -1) {
         subsTrackSelect.value = firstValidIdx;
         showSubs(data.subs_tracks[firstValidIdx].text, data.subs_tracks[firstValidIdx].type);
+        window.subsText = data.subs_tracks[firstValidIdx].text;
+        window.subsType = data.subs_tracks[firstValidIdx].type;
       } else {
-        // Если есть ошибка в первой дорожке — показываем её
         const firstError = data.subs_tracks.find(t => t.error);
         if (firstError) {
           subsPreview.innerHTML = firstError.error;
@@ -166,30 +178,41 @@ function uploadAndExtract(file) {
         }
         subsPreviewBlock.style.display = '';
         subsUploadBlock.style.display = 'none';
+        window.subsText = '';
+        window.subsType = '';
       }
       subsTrackSelect.onchange = function() {
         const idx = parseInt(this.value);
         if (allExtractedSubs[idx] && allExtractedSubs[idx].text && allExtractedSubs[idx].text.trim()) {
           showSubs(allExtractedSubs[idx].text, allExtractedSubs[idx].type);
+          window.subsText = allExtractedSubs[idx].text;
+          window.subsType = allExtractedSubs[idx].type;
         } else if (allExtractedSubs[idx] && allExtractedSubs[idx].error) {
           subsPreview.innerHTML = allExtractedSubs[idx].error;
           subsPreviewBlock.style.display = '';
           subsUploadBlock.style.display = 'none';
+          window.subsText = '';
+          window.subsType = '';
         } else {
           subsPreview.innerHTML = 'Субтитры не найдены или не поддерживаются.';
           subsPreviewBlock.style.display = '';
           subsUploadBlock.style.display = 'none';
+          window.subsText = '';
+          window.subsType = '';
         }
       };
-      // --- ПОКАЗЫВАЕМ subsPreviewBlock если есть дорожки ---
       subsPreviewBlock.style.display = '';
     } else if (data.subs_text) {
       subsTrackSelect.style.display = 'none';
       showSubs(data.subs_text, data.subs_type);
       subsPreviewBlock.style.display = '';
+      window.subsText = data.subs_text;
+      window.subsType = data.subs_type;
     } else {
       subsTrackSelect.style.display = 'none';
       showSubsUpload();
+      window.subsText = '';
+      window.subsType = '';
     }
   })
   .catch(e => {
